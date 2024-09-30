@@ -1,0 +1,65 @@
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+def performHealthCheck(String url) {
+    def process = "curl -s -o /dev/null -w '%{http_code}' ${url}".execute()
+    def statusCode = process.text.trim()
+    return statusCode == "200"
+}
+
+def readFileFromResources(String fileName) {
+    // Get the ClassLoader
+    ClassLoader classLoader = getClass().getClassLoader()
+    
+    // Get the resource as an InputStream
+    InputStream inputStream = classLoader.getResourceAsStream(fileName)
+    
+    if (inputStream == null) {
+        throw new IllegalArgumentException("File not found: " + fileName)
+    }
+    
+    // Read the contents of the file
+    try {
+        return inputStream.text
+    } finally {
+        inputStream.close()
+    }
+}
+
+// Usage example
+def fileName = "healthcheck_config.json"
+def fileContents = readFileFromResources(fileName)
+println fileContents
+
+def updateStatus(String url, Map<String, String> statusData) {
+    def jsonPayload = JsonOutput.toJson(statusData)
+    def updateProcess = [
+        "curl",
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", jsonPayload,
+        url
+    ].execute()
+    println "Status update result: ${updateProcess.text}"
+}
+
+// Read configuration from JSON file
+def jsonFile = readFileFromResources("healthcheck_config.json")
+def config = new JsonSlurper().parse(jsonFile)
+
+// Perform health checks and update status
+config.services.each { service ->
+    println "Checking ${service.microserviceName} on ${service.systemInstance}..."
+    
+    def isHealthy = performHealthCheck(service.healthCheckUrl)
+    println "${service.microserviceName} is ${isHealthy ? 'healthy' : 'unhealthy'}"
+    
+    def statusData = [
+        MicroserviceName: service.microserviceName,
+        SystemInstance: service.systemInstance,
+        Status: isHealthy ? "Healthy" : "Unhealthy"
+    ]
+    
+    updateStatus(service.statusUpdateUrl, statusData)
+    println ""
+}
