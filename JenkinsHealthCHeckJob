@@ -6,6 +6,7 @@ pipeline {
             steps {
                 script {
                     // Read JSON file
+                    echo "Read JSON file"
                     def jsonContent = readFile 'healthcheck.json'
                     def healthChecks = readJSON text: jsonContent
 
@@ -15,14 +16,16 @@ pipeline {
                         def systemInstance = healthCheck.systeminstance
 
                         // Perform GET request
+                        echo "Make get call to the healthcheck url"
                         def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' ${healthCheckUrl}", returnStdout: true).trim()
 
                         // Determine status based on response code
                         def status = (response == "200") ? "UP" : "DOWN"
 
                         // Update status using PUT request
+                        echo "Update status for the microservice"
                         def putUrl = "http://status-update-api.example.com/update"
-                        def putData = "{\"microservice\":\"${microserviceName}\",\"instance\":\"${systemInstance}\",\"status\":\"${status}\"}"
+                        def putData = "{\"Micro Service\":\"${microserviceName}\",\"SystemInstance\":\"${systemInstance}\",\"status\":\"${status}\"}"
                         
                         sh "curl -X PUT -H 'Content-Type: application/json' -d '${putData}' ${putUrl}"
 
